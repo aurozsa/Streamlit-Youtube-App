@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px  # New library for interactive visualizations
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -38,8 +39,8 @@ metric = st.sidebar.selectbox(
 # Apply Filters
 filtered_df = df[
     (df['category_name'].isin(categories)) &
-    (df['publish_date'] >= pd.Timestamp(date_range[0])) &
-    (df['publish_date'] <= pd.Timestamp(date_range[1]))
+    (df['publish_date'] >= pd.Timestamp(date_range[0]).tz_localize('UTC')) &
+    (df['publish_date'] <= pd.Timestamp(date_range[1]).tz_localize('UTC'))
 ]
 
 # Tabs for Visualization
@@ -58,27 +59,37 @@ with tab1:
 with tab2:
     st.header("Time-Series Analysis")
     st.write("Analyze trends over time for the selected metric.")
+    st.write(f"Currently selected metric: {metric.capitalize()}")
+    
     daily_metric = filtered_df.groupby(filtered_df['publish_date'].dt.date)[metric].mean().reset_index()
     
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(daily_metric['publish_date'], daily_metric[metric], marker='o', linestyle='-', label=metric)
-    ax.set_title(f"{metric.capitalize()} Over Time")
-    ax.set_xlabel("Publish Date")
-    ax.set_ylabel(metric.capitalize())
-    ax.legend()
-    st.pyplot(fig)
+    # Interactive Plotly Chart
+    fig = px.line(
+        daily_metric,
+        x='publish_date',
+        y=metric,
+        title=f"{metric.capitalize()} Over Time",
+        labels={'publish_date': 'Publish Date', metric: metric.capitalize()}
+    )
+    fig.update_traces(mode="lines+markers")  # Add markers for hover interactivity
+    st.plotly_chart(fig, use_container_width=True)
 
 # Tab 3: Category Insights
 with tab3:
     st.header("Category-Based Insights")
     st.write("Compare engagement metrics across different categories.")
-    fig, ax = plt.subplots(figsize=(12, 8))
-    sns.boxplot(x='category_name', y=metric, data=filtered_df, ax=ax)
-    ax.set_title(f"{metric.capitalize()} by Category")
-    ax.set_xlabel("Category")
-    ax.set_ylabel(metric.capitalize())
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    st.write(f"Currently selected metric: {metric.capitalize()}")
+    
+    # Interactive Plotly Boxplot
+    fig = px.box(
+        filtered_df,
+        x='category_name',
+        y=metric,
+        title=f"{metric.capitalize()} by Category",
+        labels={'category_name': 'Category', metric: metric.capitalize()}
+    )
+    fig.update_layout(xaxis_title="Category", yaxis_title=metric.capitalize(), showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
 
 # Tab 4: Custom Metrics
 with tab4:
@@ -86,14 +97,19 @@ with tab4:
     st.write("Explore engagement metrics like 'Likes per View' or 'Comments per View'.")
     selected_metric = st.radio(
         "Select a Metric",
-        ['likes_per_view', 'comments_per_view']
+        ['likes_per_view', 'comments_per_view'],
+        index=0
     )
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.histplot(filtered_df[selected_metric], bins=30, kde=True, ax=ax)
-    ax.set_title(f"Distribution of {selected_metric.replace('_', ' ').capitalize()}")
-    ax.set_xlabel(selected_metric.replace('_', ' ').capitalize())
-    ax.set_ylabel("Frequency")
-    st.pyplot(fig)
+    
+    fig = px.histogram(
+        filtered_df,
+        x=selected_metric,
+        nbins=30,
+        title=f"Distribution of {selected_metric.replace('_', ' ').capitalize()}",
+        labels={selected_metric: selected_metric.replace('_', ' ').capitalize()}
+    )
+    fig.update_layout(xaxis_title=selected_metric.replace('_', ' ').capitalize(), yaxis_title="Frequency")
+    st.plotly_chart(fig, use_container_width=True)
 
 # Sidebar Info Section
 with st.sidebar.expander("About the App"):
